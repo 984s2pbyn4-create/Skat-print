@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>СКАТ: Документооборот</title>
+    <style>
+        :root {
+            --bg: #0f1412; --panel: #1a211d; --ink: #e2efe6; --mute: #93a99b; 
+            --signal: #5cff9d; --line: #2b322e; --warn: #ff5e52; --ease: cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        body {
+            margin: 0; background: var(--bg); color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-user-select: none; user-select: none; padding-bottom: 40px;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 16px; }
+        h1 { font-size: 24px; text-align: center; color: var(--signal); margin-bottom: 20px; letter-spacing: 1px; }
+        
+        /* Табы */
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tabs button { flex: 1; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-weight: 600; }
+        .tabs button.active { background: var(--signal); color: #03140a; border-color: var(--signal); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+        .card h3 { margin-top: 0; margin-bottom: 12px; font-size: 16px; color: var(--mute); }
+        
+        label { display: block; font-size: 13px; color: var(--mute); margin-bottom: 8px; }
+        input, textarea, select {
+            width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.2);
+            border: 1px solid var(--line); color: var(--ink); border-radius: 8px;
+            padding: 10px; font-size: 16px; margin-top: 4px; font-family: inherit;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--signal); }
+        textarea { resize: vertical; min-height: 150px; }
+        
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+        button {
+            padding: 12px; border: none; border-radius: 10px;
+            font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s var(--ease);
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        button:active { transform: scale(0.97); }
+        .btn-primary { background: var(--signal); color: #03140a; }
+        .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+        
+        .hint { font-size: 12px; color: var(--mute); line-height: 1.4; margin-top: 8px; }
+
+        /* Скрытый контейнер для печати (PDF/AirPrint) */
+        #printArea { display: none; }
+
+        @media print {
+            body { background: #fff; color: #000; margin: 0; padding: 0; }
+            .container, .tabs, .no-print { display: none !important; }
+            #printArea { display: block !important; padding: 20mm; font-family: 'Times New Roman', serif; }
+            
+            .doc-header { display: flex; justify-content: space-between; margin-bottom: 40px; font-size: 14px; }
+            .stamp-gr { font-weight: bold; }
+            .stamp-ut { text-align: left; margin-left: 50%; line-height: 1.5; }
+            .doc-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+            .doc-date { text-align: center; margin-bottom: 30px; }
+            .doc-body { white-space: pre-wrap; font-size: 14px; line-height: 1.6; text-align: justify; }
+            .doc-footer { margin-top: 40px; font-size: 12px; text-align: right; color: #555; }
+            @page { size: A4 portrait; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container no-print">
+    <h1>СКАТ: Документы</h1>
+
+    <div class="tabs">
+        <button class="active" onclick="switchTab('editor')">Редактор</button>
+        <button onclick="switchTab('export')">Экспорт</button>
+    </div>
+
+    <!-- Вкладка 1: Редактор -->
+    <div id="tab-editor" class="tab-content active">
+        <div class="card">
+            <h3>Штамп и подписи</h3>
+            <label>Гриф (справа вверху)
+                <input type="text" id="inpGr" placeholder="Экз. № 1 / ДСП">
+            </label>
+            <label>«Утверждаю»: Должность
+                <input type="text" id="inpUt" placeholder="Командир 1 мсб">
+            </label>
+            <label>«Утверждаю»: Звание, ФИО
+                <input type="text" id="inpUtN" placeholder="майор И. Иванов">
+            </label>
+            <label>Исполнитель
+                <input type="text" id="inpIsp" placeholder="НШ капитан П. Петров">
+            </label>
+        </div>
+
+        <div class="card">
+            <h3>Текст документа</h3>
+            <label>Заголовок
+                <input type="text" id="inpTitle" value="БОЕВОЕ РАСПОРЯЖЕНИЕ">
+            </label>
+            <label>Дата
+                <input type="date" id="inpDate">
+            </label>
+            <label>Содержание
+                <textarea id="inpBody" placeholder="1. Противник...&#10;2. Задача..."></textarea>
+            </label>
+        </div>
+    </div>
+
+    <!-- Вкладка 2: Экспорт -->
+    <div id="tab-export" class="tab-content">
+        <div class="card">
+            <h3>Печать и сохранение</h3>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="doPrint()">🖨 AirPrint / PDF</button>
+                <button class="btn-ghost" onclick="downloadJPG()">🖼 Скачать JPG</button>
+            </div>
+            <div class="btn-group">
+                <button class="btn-ghost" onclick="downloadWord()">📄 Скачать Word (.doc)</button>
+                <button class="btn-ghost" onclick="downloadExcel()">📊 Скачать Excel (.csv)</button>
+            </div>
+            <p class="hint">
+                <b>AirPrint</b> откроет системное окно печати Apple. Там можно выбрать принтер, количество копий, ориентацию и сохранить в PDF.<br><br>
+                <b>Word</b> создаст файл, который откроется в Pages или Word. Сложное форматирование может сместиться.<br><br>
+                <b>Excel</b> сохранит данные в формате CSV, который откроется в Numbers или Excel.
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<!-- Скрытый лист для печати -->
+<div id="printArea">
+    <div class="doc-header">
+        <div class="stamp-gr" id="prnGr"></div>
+        <div class="stamp-ut" id="prnUt"></div>
+    </div>
+    <div class="doc-title" id="prnTitle"></div>
+    <div class="doc-date" id="prnDate"></div>
+    <div class="doc-body" id="prnBody"></div>
+    <div class="doc-footer" id="prnIsp"></div>
+</div>
+
+<script>
+    const fields = ['inpGr', 'inpUt', 'inpUtN', 'inpIsp', 'inpTitle', 'inpDate', 'inpBody'];
+
+    // Инициализация даты
+    document.getElementById('inpDate').valueAsDate = new Date();
+
+    // Загрузка сохраненного
+    window.onload = () => {
+        fields.forEach(id => {
+            const val = localStorage.getItem('skat_doc_' + id);
+            if (val) document.getElementById(id).value = val;
+        });
+    };
+
+    // Автосохранение при вводе
+    fields.forEach(id => {
+        document.getElementById(id).addEventListener('input', (e) => {
+            localStorage.setItem('skat_doc_' + id, e.target.value);
+        });
+    });
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // Сбор данных
+    function getData() {
+        const dateStr = document.getElementById('inpDate').value;
+        let d = '';
+        if (dateStr) {
+            const parts = dateStr.split('-');
+            d = `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+        return {
+            gr: document.getElementById('inpGr').value,
+            ut: document.getElementById('inpUt').value,
+            utN: document.getElementById('inpUtN').value,
+            isp: document.getElementById('inpIsp').value,
+            title: document.getElementById('inpTitle').value,
+            date: d,
+            body: document.getElementById('inpBody').value
+        };
+    }
+
+    // 1. ПЕЧАТЬ (AirPrint / PDF)
+    function doPrint() {
+        const data = getData();
+        document.getElementById('prnGr').textContent = data.gr;
+        
+        let utHtml = '';
+        if (data.ut || data.utN) {
+            utHtml = `<div>УТВЕРЖДАЮ</div><div>${data.ut}</div><div>${data.utN}</div><div>«___» ____________ 20__ г.</div>`;
+        }
+        document.getElementById('prnUt').innerHTML = utHtml;
+        
+        document.getElementById('prnTitle').textContent = data.title;
+        document.getElementById('prnDate').textContent = data.date ? `от ${data.date}` : '';
+        document.getElementById('prnBody').textContent = data.body;
+        document.getElementById('prnIsp').textContent = data.isp ? `Исполнитель: ${data.isp}` : '';
+
+        window.print();
+    }
+
+    // 2. СКАЧАТЬ JPG (Рендер в Canvas)
+    function downloadJPG() {
+        const data = getData();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Размер A4 в пикселях (300 dpi - хорошее качество для печати)
+        const width = 2480;
+        const height = 3508;
+        canvas.width = width;
+        canvas.height = height;
+
+        // Белый фон
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        // Настройки шрифта
+        ctx.fillStyle = '#000000';
+        ctx.textBaseline = 'top';
+
+        // Гриф
+        if (data.gr) {
+            ctx.font = 'bold 40px "Times New Roman"';
+            ctx.textAlign = 'right';
+            ctx.fillText(data.gr, width - 150, 150);
+        }
+
+        // Утверждаю
+        if (data.ut || data.utN) {
+            ctx.textAlign = 'left';
+            ctx.font = '40px "Times New Roman"';
+            let y = 150;
+            ctx.fillText('УТВЕРЖДАЮ', width / 2, y); y += 50;
+            if (data.ut) { ctx.fillText(data.ut, width / 2, y); y += 50; }
+            if (data.utN) { ctx.fillText(data.utN, width / 2, y); y += 50; }
+            ctx.fillText('«___» ____________ 20__ г.', width / 2, y);
+        }
+
+        // Заголовок
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 50px "Times New Roman"';
+        ctx.fillText(data.title, width / 2, 500);
+
+        // Дата
+        if (data.date) {
+            ctx.font = '40px "Times New Roman"';
+            ctx.fillText('от ' + data.date, width / 2, 580);
+        }
+
+        // Тело (с переносом строк)
+        ctx.textAlign = 'left';
+        ctx.font = '40px "Times New Roman"';
+        const lines = data.body.split('\n');
+        let y = 700;
+        const margin = 150;
+        const maxWidth = width - margin * 2;
+
+        lines.forEach(line => {
+            const words = line.split(' ');
+            let currentLine = '';
+            words.forEach(word => {
+                const testLine = currentLine + word + ' ';
+                if (ctx.measureText(testLine).width > maxWidth && currentLine !== '') {
+                    ctx.fillText(currentLine, margin, y);
+                    y += 60;
+                    currentLine = word + ' ';
+                } else {
+                    currentLine = testLine;
+                }
+            });
+            ctx.fillText(currentLine, margin, y);
+            y += 60; // Межстрочный интервал
+        });
+
+        // Исполнитель
+        if (data.isp) {
+            ctx.font = 'italic 36px "Times New Roman"';
+            ctx.textAlign = 'right';
+            ctx.fillText('Исполнитель: ' + data.isp, width - margin, height - 200);
+        }
+
+        // Скачивание
+        const link = document.createElement('a');
+        link.download = 'Документ_' + new Date().getTime() + '.jpg';
+        link.href = canvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+    }
+
+    // 3. СКАЧАТЬ WORD (.doc)
+    function downloadWord() {
+        const data = getData();
+        const html = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset="utf-8"><title>${data.title}</title>
+            <style>
+                body { font-family: 'Times New Roman', serif; font-size: 14pt; }
+                .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
+                .stamp-ut { text-align: left; }
+                h1 { text-align: center; font-size: 18pt; text-transform: uppercase; }
+                .date { text-align: center; margin-bottom: 30px; }
+                .body { white-space: pre-wrap; text-align: justify; line-height: 1.5; }
+            </style>
+            </head><body>
+            <div class="header">
+                <div><b>${data.gr}</b></div>
+                <div class="stamp-ut">
+                    ${data.ut ? `<p>УТВЕРЖДАЮ<br>${data.ut}<br>${data.utN}<br>«___» ____________ 20__ г.</p>` : ''}
+                </div>
+            </div>
+            <h1>${data.title}</h1>
+            <div class="date">${data.date ? 'от ' + data.date : ''}</div>
+            <div class="body">${data.body}</div>
+            <br><br>
+            <div style="text-align: right; font-size: 12pt;">Исполнитель: ${data.isp}</div>
+            </body></html>
+        `;
+        
+        const blob = new Blob([html], {type: 'application/msword'});
+        const link = document.createElement('a');
+        link.download = 'Документ_' + new Date().getTime() + '.doc';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
+
+    // 4. СКАЧАТЬ EXCEL (.csv)
+    function downloadExcel() {
+        const data = getData();
+        // Формируем CSV с разделителем "точка с запятой" (для русской локали)
+        const rows = [
+            ["Гриф", data.gr],
+            ["Должность", data.ut],
+            ["ФИО", data.utN],
+            ["Заголовок", data.title],
+            ["Дата", data.date],
+            ["Текст документа", data.body],
+            ["Исполнитель", data.isp]
+        ];
+        
+        let csvContent = "\uFEFF"; // BOM для корректного открытия кириллицы в Excel
+        rows.forEach(row => {
+            // Экранирование кавычек
+            const cleanRow = row.map(cell => `"${String(cell).replace(/"/g, '""')}"`);
+            csvContent += cleanRow.join(";") + "\r\n";
+        });
+
+        const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+        const link = document.createElement('a');
+        link.download = 'Документ_' + new Date().getTime() + '.csv';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
+</script>
+</body>
+</html>
